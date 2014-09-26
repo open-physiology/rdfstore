@@ -12,6 +12,7 @@ INSTALLATION
 4. Once compiled, run "java Rdfstore -help" for further details.
    In order to get Rdfstore running, it is assumed there is a particular SPARQL
    endpoint already running that you want Rdfstore to talk to.
+   See the "example" below.
 5. For convenience, once Rdfstore is running, it includes a simple GUI.
    For example, if you're running Rdfstore on port 20060 (the default), you can
    access the GUI at http://localhost:20060/gui
