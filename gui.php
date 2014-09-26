@@ -21,7 +21,8 @@
   <div class='seven columns' id='leftdiv'>
     <h2>Select Template</h2>
     <div>
-      Select a query template for querying the triple store
+      Select a query template for querying the triple store.  (The "get_resources" and "get_relations" templates can be used to see what sort of
+      things are available on the sandbox.)
     </div>
     <hr>
     <div>
