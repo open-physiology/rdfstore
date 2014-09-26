@@ -482,7 +482,7 @@ public class Rdfstore
     for ( Sparql_template tmplt : r.templates )
     {
       the_menu += "<option value='"+tmplt.name+"'>"+tmplt.name+"</option>";
-      if ( tmplt.text.contains("<[]>") == false )
+      if ( tmplt.text.contains("[]") == false )
         fNullaryTemplate = true;
     }
 
@@ -495,7 +495,7 @@ public class Rdfstore
       String ifchecks = "";
       for ( Sparql_template tmplt : r.templates )
       {
-        if ( tmplt.text.contains("<[]>") == false )
+        if ( tmplt.text.contains("[]") == false )
           ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    inputbox.style.visibility = 'hidden'\n  else\n";
       }
 
