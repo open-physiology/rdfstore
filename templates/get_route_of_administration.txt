@@ -1,0 +1,2 @@
+SELECT ?o WHERE {<[]> 
+<http://www.pharmml.org/2013/10/PharmMLMetadata#model-related-to-drug> ?o}

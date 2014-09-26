@@ -1,0 +1,2 @@
+SELECT ?p ?a
+WHERE { <[]> ?p ?a }
