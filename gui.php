@@ -37,9 +37,18 @@
     </div>
     <hr>
     <div id='rightpadding'>
-      <input id="inputbox" onKeyUp="inputkey(event);" style="width:100%">
-      <div>
-        <button onclick="rdfstore_run(g('pulldown').value+'/'+parse_iri(g('inputbox').value));" style="width:100%">Enter</button>
+      <input id="inputbox0" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox1" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox2" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox3" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox4" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox5" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox6" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox7" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox8" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <input id="inputbox9" onKeyUp="inputkey(event);" style="width:100%; display:none">
+      <div style="visibility:hidden" id="buttondiv">
+        <button onclick="rdfstore_run();" style="width:100%">Enter</button>
       </div>
       <div id="rdfstore_results">
       </div>

@@ -1,2 +1,2 @@
 SELECT ?p ?a
-WHERE { <[]> ?p ?a }
+WHERE { <[0]> ?p ?a }

@@ -1,6 +1,10 @@
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.Map;
+import java.util.HashMap;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -31,6 +35,12 @@ public class Rdfstore
 
   public static void main(String [] args) throws Exception
   {
+    //String x = "Testin\ng [5] Testing";
+    //if ( x.matches("(?s).*\\[5\\].*") )
+      //System.out.println("T");
+    //else
+      //System.out.println("F");
+
     Rdfstore r = new Rdfstore();
     r.run(args);
   }
@@ -116,12 +126,37 @@ public class Rdfstore
         fJson = 0;
 
       String response;
-      String req = t.getRequestURI().toString().substring(4+tmplt.name.length());
-      req = java.net.URLDecoder.decode(req, "UTF-8");
+      String req = t.getRequestURI().toString().substring(3+tmplt.name.length());
 
-      System.out.println( "Got request: "+req );
+      Map<String, String> params = get_args(req);
 
-      String query = tmplt.text.replace("[]",req);
+      System.out.println( "Got request:" );
+      for ( Map.Entry<String,String> entry : params.entrySet() )
+        System.out.print( "["+entry.getKey()+"]=["+entry.getValue()+"] " );
+      System.out.print("\n");
+
+      String query = tmplt.text;
+      for ( Map.Entry<String,String> entry : params.entrySet() )
+      {
+        if ( entry.getValue() == "" )
+        {
+          send_response( t, "Error: An entry in the template was left blank." );
+          return;
+        }
+        query = query.replace("["+entry.getKey()+"]", entry.getValue());
+      }
+
+      if ( query.matches("(?s).*\\[[0-9]\\].*") )
+      {
+        for ( int i = 0; i <= 9; i++ )
+        {
+          if ( query.matches("(?s).*\\["+i+"\\].*" ) )
+          {
+            send_response( t, "Error: Template entry "+i+" is missing" );
+            return;
+          }
+        }
+      }
 
       URL u;
       HttpURLConnection c;
@@ -130,7 +165,7 @@ public class Rdfstore
       {
         if ( r.sparql_method.equals("get") )
         {
-          u = new URL(r.sparql_addy + java.net.URLEncoder.encode(query,"UTF-8"));
+          u = new URL(r.sparql_addy + URLEncoder.encode(query,"UTF-8"));
           c = (HttpURLConnection) u.openConnection();
         }
         else
@@ -140,7 +175,7 @@ public class Rdfstore
           c.setDoOutput(true);
           c.setRequestMethod("POST");
           c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-          encoded = java.net.URLEncoder.encode(query,"UTF-8");
+          encoded = URLEncoder.encode(query,"UTF-8");
           c.setRequestProperty("Content-Length", String.valueOf(encoded.length()));
         }
 
@@ -463,7 +498,6 @@ public class Rdfstore
   {
     String the_html;
     String the_js;
-    boolean fNullaryTemplate = false;
 
     try
     {
@@ -478,34 +512,58 @@ public class Rdfstore
 
     the_html = the_html.replace("@JAVASCRIPT", "<script type='text/javascript'>"+the_js+"</script>");
 
-    String the_menu = "<select id='pulldown' onchange='pulldownchange();'>";
+    String the_menu = "<select id='pulldown' onchange='pulldownchange();'><option value='nosubmit' selected='selected'>Choose Template</option>";
     for ( Sparql_template tmplt : r.templates )
-    {
       the_menu += "<option value='"+tmplt.name+"'>"+tmplt.name+"</option>";
-      if ( tmplt.text.contains("[]") == false )
-        fNullaryTemplate = true;
-    }
 
     the_menu += "</select>";
 
     the_html = the_html.replace("@PULLDOWNMENU", the_menu);
 
-    if ( fNullaryTemplate )
+    String ifchecks = "if ( templatename == 'nosubmit' )\n    hide_input_boxes();\n  else\n";
+    for ( Sparql_template tmplt : r.templates )
     {
-      String ifchecks = "";
-      for ( Sparql_template tmplt : r.templates )
+      if ( tmplt.text.matches("(?s).*\\[[0-9]\\].*") == false )
+        ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    hide_input_boxes();\n  else\n";
+      else
       {
-        if ( tmplt.text.contains("[]") == false )
-          ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    inputbox.style.visibility = 'hidden'\n  else\n";
+        ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    show_input_boxes('";
+        for ( int i = 0; i <= 9; i++ )
+        {
+          if ( tmplt.text.contains("["+i+"]") )
+            ifchecks += i;
+        }
+        ifchecks += "');\n  else\n";
       }
-
-      ifchecks += "    inputbox.style.visibility = 'visible'";
-
-      the_html = the_html.replace("@CHANGESELECTIONCODE", ifchecks);
     }
-    else
-      the_html = the_html.replace("@CHANGESELECTIONCODE", "// Do nothing, since no templates are nullary" );
+
+    ifchecks += "    hide_input_boxes();\n";
+
+    ifchecks += "  if ( templatename == 'nosubmit' )\n    hide_input_button();\n  else\n    show_input_button();";
+
+    the_html = the_html.replace("@CHANGESELECTIONCODE", ifchecks);
 
     send_response( t, the_html );
+  }
+
+  public static Map<String, String> get_args(String query)
+  {
+    Map<String, String> result = new HashMap<String, String>();
+    try
+    {
+      for (String param : query.split("&"))
+      {
+        String pair[] = param.split("=");
+        if (pair.length > 1)
+          result.put(URLDecoder.decode(pair[0],"UTF-8"), URLDecoder.decode(pair[1],"UTF-8"));
+        else
+          result.put(URLDecoder.decode(pair[0],"UTF-8"), "");
+      }
+    }
+    catch( Exception e )
+    {
+      ;
+    }
+    return result;
   }
 }

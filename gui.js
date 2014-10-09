@@ -1,3 +1,4 @@
+
 if(typeof String.prototype.trim !== 'function') {
   String.prototype.trim = function() {
     return this.replace(/^\s+|\s+$/g, '');
@@ -11,16 +12,34 @@ function g(x)
 
 function inputkey(e)
 {
-  if (e.keyCode=='13' && g("inputbox").value != "")
-  {
-    rdfstore_run(g('pulldown').value+'/'+parse_iri(g('inputbox').value));
-    //g("inputbox").value="";
-  }
+  if (e.keyCode=='13')
+    rdfstore_run();
 }
 
-function rdfstore_run(query)
+function rdfstore_run()
 {
-  var url = encodeURIComponent(query);
+  var url = encodeURIComponent(g('pulldown').value)+'/';
+  var fFirst = 0;
+  var inputbox;
+
+  for ( var i = 0; i <= 9; i++ )
+  {
+    inputbox = g("inputbox"+i);
+
+    if ( inputbox.style.display != "none" )
+    {
+      if ( fFirst == 0 )
+      {
+        fFirst = 1;
+        url += '?';
+      }
+      else
+        url += '&';
+
+      url += i + "=" + parse_iri(inputbox.value);
+    }
+  }
+
   var xmlhttp;
 
   if ( window.XMLHttpRequest )
@@ -46,7 +65,6 @@ function rdfstore_run(query)
 function pulldownchange()
 {
   var pulldown = g("pulldown");
-  var inputbox = g("inputbox");
   var templatename = pulldown.value;
 
   @CHANGESELECTIONCODE
@@ -57,5 +75,29 @@ function parse_iri(x)
   if ( x.charAt(0) == '<' && x.charAt(x.length-1) == '>' )
     x = x.substring(1,x.length-1);
 
-  return x;
+  return encodeURIComponent(x);
+}
+
+function hide_input_boxes()
+{
+  for ( var i = 0; i <= 9; i++ )
+    g("inputbox"+i).style.display = 'none';
+}
+
+function show_input_boxes(x)
+{
+  for ( var i = 0; i <= 9; i++ )
+    g("inputbox"+i).style.display = 'none';
+  for ( var i = 0; i < x.length; i++ )
+    g("inputbox"+x.charAt(i)).style.display = 'block';
+}
+
+function hide_input_button()
+{
+  g("buttondiv").style.visibility = 'hidden';
+}
+
+function show_input_button()
+{
+  g("buttondiv").style.visibility = 'visible';
 }

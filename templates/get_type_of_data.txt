@@ -1,1 +1,1 @@
-SELECT ?o WHERE {<[]> <http://www.pharmml.org/2013/10/PharmMLMetadata#model-type-of-data> ?o}
+SELECT ?o WHERE {<[0]> <http://www.pharmml.org/2013/10/PharmMLMetadata#model-type-of-data> ?o}
