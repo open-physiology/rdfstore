@@ -125,8 +125,15 @@ public class Rdfstore
       else
         fJson = 0;
 
-      String response;
-      String req = t.getRequestURI().toString().substring(3+tmplt.name.length());
+      String response, req;
+      try
+      {
+        req = t.getRequestURI().toString().substring(3+tmplt.name.length());
+      }
+      catch(Exception e)
+      {
+        req = "";
+      }
 
       Map<String, String> params = get_args(req);
 
@@ -138,7 +145,7 @@ public class Rdfstore
       String query = tmplt.text;
       for ( Map.Entry<String,String> entry : params.entrySet() )
       {
-        if ( entry.getValue() == "" )
+        if ( entry.getValue() == "" && entry.getKey() != "" )
         {
           send_response( t, "Error: An entry in the template was left blank." );
           return;
