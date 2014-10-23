@@ -165,53 +165,13 @@ public class Rdfstore
         }
       }
 
-      URL u;
-      HttpURLConnection c;
-      String encoded=null;
-      try
-      {
-        if ( r.sparql_method.equals("get") )
-        {
-          u = new URL(r.sparql_addy + URLEncoder.encode(query,"UTF-8"));
-          c = (HttpURLConnection) u.openConnection();
-        }
-        else
-        {
-          u = new URL(r.sparql_addy);
-          c = (HttpURLConnection) u.openConnection();
-          c.setDoOutput(true);
-          c.setRequestMethod("POST");
-          c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-          encoded = URLEncoder.encode(query,"UTF-8");
-          c.setRequestProperty("Content-Length", String.valueOf(encoded.length()));
-        }
+      String sparql_answer;
 
-        c.setConnectTimeout(2000); //To do: make this configurable.
-        c.setReadTimeout(5000);  //This too.
+      if ( r.sparql_method.equals("get") )
+        sparql_answer = sparql_query_using_get(r,query);
+      else
+        sparql_answer = sparql_query_using_post(r,query);
 
-        if ( r.sparql_method.equals("post") )
-        {
-          OutputStream os = c.getOutputStream();
-          os.write(encoded.getBytes());
-        }
-      }
-      catch(Exception e)
-      {
-        send_server_error(t);
-        return;
-      }
-
-      Scanner sc=null;
-      try
-      {
-        sc = new Scanner(c.getInputStream());
-      }
-      catch(Exception e)
-      {
-        e.printStackTrace();
-      }
-
-      String sparql_answer = sc.useDelimiter("\\A").next();
       sparql_answer = escapeHTML(sparql_answer);
 
       if ( sparql_answer.charAt(0) == '?' )
@@ -224,12 +184,69 @@ public class Rdfstore
         sparql_answer = "No results.";
 
       send_response( t, "<pre>"+sparql_answer+"</pre>" );
-      //bookmark
     }
 
     public void send_server_error(HttpExchange t)
     {
-      send_response( t, "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint." );
+      send_response( t, "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with the sparql endpoint." );
+    }
+
+    public static String sparql_query_using_post(Rdfstore r, String query)
+    {
+      try
+      {
+        StringBuilder postData = new StringBuilder();
+        postData.append("query="+URLEncoder.encode(query, "UTF-8"));
+        byte[] postDataBytes = postData.toString().getBytes("UTF-8");
+
+        URL u = new URL(r.sparql_addy);
+        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+        c.setRequestMethod("POST");
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        c.setRequestProperty("Content-Length", String.valueOf(postDataBytes.length));
+        c.setDoOutput(true);
+        c.getOutputStream().write(postDataBytes);
+
+        Reader in = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
+        StringBuilder answer = new StringBuilder();
+        for ( int x; (x = in.read()) >= 0; answer.append((char)x) );
+        return answer.toString();
+      }
+      catch( Exception e )
+      {
+        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
+      }
+    }
+
+    public static String sparql_query_using_get(Rdfstore r, String query)
+    {
+      URL u;
+      HttpURLConnection c;
+      String encoded=null;
+      try
+      {
+        u = new URL(r.sparql_addy + URLEncoder.encode(query,"UTF-8"));
+        c = (HttpURLConnection) u.openConnection();
+
+        c.setConnectTimeout(2000); //To do: make this configurable.
+        c.setReadTimeout(5000);  //This too.
+      }
+      catch(Exception e)
+      {
+        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
+      }
+
+      Scanner sc=null;
+      try
+      {
+        sc = new Scanner(c.getInputStream());
+      }
+      catch(Exception e)
+      {
+        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
+      }
+
+      return sc.useDelimiter("\\A").next();
     }
 
     /*
