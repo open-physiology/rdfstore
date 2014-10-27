@@ -20,12 +20,14 @@ public class Rdfstore
   /*
    * Variables that can be specified by command-line argument
    */
-  public String template_dir;   // Directory with sparql templates.  Default: ./templates
-  public boolean help_only;     // Whether to quit after displaying help info.  Default: false
-  public String sparql_addy;    // Address where to send sparql queries to.  Default: http://localhost
-  public String sparql_method;  // Method to use for sparql queries (get or post).  Default: get
-  public String sparql_fmt;     // Format to apply to sparl queries.  Default: %s
-  public int port;              // Port for Ricord Rdfstore.java server to listen on.  Default: 20060
+  public String template_dir;         // Directory with sparql templates.  Default: ./templates
+  public boolean help_only;           // Whether to quit after displaying help info.  Default: false
+  public String sparql_addy;          // Address where to send sparql queries to.  Default: http://localhost
+  public String sparql_method;        // Method to use for sparql queries (get or post).  Default: get
+  public String sparql_update_addy;   // Address where to send sparql updates to.  Default: Mimic sparql_addy
+  public String sparql_update_method; // Method to use for sparql updates (get or post).  Default: Mimic sparql_method
+  public String sparql_fmt;           // Format to apply to sparl queries.  Default: %s
+  public int port;                    // Port for Ricord Rdfstore.java server to listen on.  Default: 20060
 
   /*
    * Variables not specified by command-line
@@ -167,10 +169,20 @@ public class Rdfstore
 
       String sparql_answer;
 
-      if ( r.sparql_method.equals("get") )
-        sparql_answer = sparql_query_using_get(r,query);
+      if ( is_update_query(query) )
+      {
+        if ( r.sparql_update_method.equals("get") )
+          sparql_answer = sparql_query_using_get(r,query,r.sparql_update_addy);
+        else
+          sparql_answer = sparql_query_using_post(r,query,r.sparql_update_addy,"update");
+      }
       else
-        sparql_answer = sparql_query_using_post(r,query);
+      {
+        if ( r.sparql_method.equals("get") )
+          sparql_answer = sparql_query_using_get(r,query,r.sparql_addy);
+        else
+          sparql_answer = sparql_query_using_post(r,query,r.sparql_addy,"query");
+      }
 
       sparql_answer = escapeHTML(sparql_answer);
 
@@ -191,15 +203,15 @@ public class Rdfstore
       send_response( t, "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with the sparql endpoint." );
     }
 
-    public static String sparql_query_using_post(Rdfstore r, String query)
+    public static String sparql_query_using_post(Rdfstore r, String query, String url, String keyname)
     {
       try
       {
         StringBuilder postData = new StringBuilder();
-        postData.append("query="+URLEncoder.encode(query, "UTF-8"));
+        postData.append(keyname+"="+URLEncoder.encode(query, "UTF-8"));
         byte[] postDataBytes = postData.toString().getBytes("UTF-8");
 
-        URL u = new URL(r.sparql_addy);
+        URL u = new URL(url);
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
         c.setRequestMethod("POST");
         c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
@@ -218,14 +230,14 @@ public class Rdfstore
       }
     }
 
-    public static String sparql_query_using_get(Rdfstore r, String query)
+    public static String sparql_query_using_get(Rdfstore r, String query, String url)
     {
       URL u;
       HttpURLConnection c;
       String encoded=null;
       try
       {
-        u = new URL(r.sparql_addy + URLEncoder.encode(query,"UTF-8"));
+        u = new URL(url + URLEncoder.encode(query,"UTF-8"));
         c = (HttpURLConnection) u.openConnection();
 
         c.setConnectTimeout(2000); //To do: make this configurable.
@@ -393,12 +405,16 @@ public class Rdfstore
     r.template_dir = "./templates";
     r.help_only = false;
     r.sparql_addy = "http://localhost";
+    r.sparql_update_addy = "http://localhost";
     r.sparql_method = "get";
+    r.sparql_update_method = "get";
     r.sparql_fmt = "%s";
     r.port = 20060;
 
     int i;
     String flag;
+    int fSparqlUpdateAddy = 0;
+    int fSparqlUpdateMethod = 0;
 
     for ( i = 0; i < args.length; i++ )
     {
@@ -418,12 +434,22 @@ public class Rdfstore
         System.out.println( "(Default: ./templates)"                                );
         System.out.println( "------------------------------------"                  );
         System.out.println( "-endpoint <URL>"                                       );
-        System.out.println( "(Specifies the sparql endpoint location)"              );
+        System.out.println( "(Specifies the sparql query endpoint location)"        );
         System.out.println( "(Default: http://localhost)"                           );
         System.out.println( "------------------------------------"                  );
         System.out.println( "-method GET, or -method POST"                          );
-        System.out.println( "(Specifies which HTTP method to use for the endpoint)" );
+        System.out.println( "(Specifies which HTTP method to use for queries)"      );
         System.out.println( "(Default: GET)"                                        );
+        System.out.println( "------------------------------------"                  );
+        System.out.println( "-update <URL>"                                         );
+        System.out.println( "(Specifies the sparql update endpoint location)"       );
+        System.out.println( "(For cases when sparql update has different URL than"  );
+        System.out.println( " query, e.g. Fuseki)"                                  );
+        System.out.println( "(Default: Mimics 'endpoint')"                          );
+        System.out.println( "------------------------------------"                  );
+        System.out.println( "-updatemethod GET, or -updatemethod POST"              );
+        System.out.println( "(Which HTTP method to use for updates)"                );
+        System.out.println( "(Default: Mimics 'method')"                            );
         System.out.println( "------------------------------------"                  );
         System.out.println( "-format <format>"                                      );
         System.out.println( "(A string, containing %s.  The %s will be replaced by" );
@@ -458,12 +484,28 @@ public class Rdfstore
       {
         if ( i+1 >= args.length )
         {
-          System.out.println( "Specify the address of the sparql endpoint." );
+          System.out.println( "Specify the address of the SPARQL query endpoint." );
           r.help_only = true;
           return;
         }
         r.sparql_addy = args[++i];
-        System.out.println( "Using "+r.sparql_addy+" as SPARQL endpoint." );
+        System.out.println( "Using "+r.sparql_addy+" as SPARQL query endpoint." );
+
+        if ( fSparqlUpdateAddy == 0 )
+          r.sparql_update_addy = r.sparql_addy;
+      }
+      else if ( flag.equals("update" ) || flag.equals("upd") )
+      {
+        fSparqlUpdateAddy = 1;
+
+        if ( i+1 >= args.length )
+        {
+          System.out.println( "Specify the address of the sparql update endpoint." );
+          r.help_only = true;
+          return;
+        }
+        r.sparql_update_addy = args[++i];
+        System.out.println( "Using "+r.sparql_update_addy+" as SPARQL update endpoint." );
       }
       else if ( flag.equals("method") || flag.equals("mthd") || flag.equals("sparql_method") )
       {
@@ -474,7 +516,23 @@ public class Rdfstore
           return;
         }
         r.sparql_method = args[++i].toLowerCase();
-        System.out.println( "Using "+args[i]+" as sparql HTTP method" );
+        System.out.println( "Using "+args[i]+" as SPARQL query HTTP method" );
+
+        if ( fSparqlUpdateMethod == 0 )
+          r.sparql_update_method = r.sparql_method;
+      }
+      else if ( flag.equals("updatemethod") || flag.equals("update_method") || flag.equals("updatemthd") || flag.equals("update_mthd") )
+      {
+        fSparqlUpdateMethod = 1;
+
+        if ( i+1 >= args.length || (!args[i+1].equals("get") && !args[i+1].equals("post") && !args[i+1].equals("GET") && !args[i+1].equals("POST")) )
+        {
+          System.out.println( "Valid update methods are:  GET, or POST" );
+          r.help_only = true;
+          return;
+        }
+        r.sparql_update_method = args[++i].toLowerCase();
+        System.out.println( "Using "+args[i]+" as SPARQL update HTTP method" );
       }
       else if ( flag.equals("fmt") || flag.equals("format") || flag.equals("sparql_fmt") || flag.equals("sparql_format") )
       {
@@ -589,5 +647,36 @@ public class Rdfstore
       ;
     }
     return result;
+  }
+
+  public static boolean is_update_query( String q )
+  {
+    String lower = q.toLowerCase();
+
+    if ( lower.substring(0,6).equals("insert") )
+      return true;
+
+    if ( lower.substring(0,6).equals("delete") )
+      return true;
+
+    if ( lower.substring(0,4).equals("load") )
+      return true;
+
+    if ( lower.substring(0,6).equals("create") )
+      return true;
+
+    if ( lower.substring(0,5).equals("clear") )
+      return true;
+
+    if ( lower.substring(0,3).equals("add") )
+      return true;
+
+    if ( lower.substring(0,4).equals("move") )
+      return true;
+
+    if ( lower.substring(0,4).equals("drop") )
+      return true;
+
+    return false;
   }
 }
