@@ -345,7 +345,7 @@ public class Rdfstore
 
     if ( folder == null || templatefiles == null )
     {
-      System.out.println( "Couldn't open SPARQL template "+template_dir+"." );
+      System.out.println( "Couldn't open SPARQL template directory "+template_dir+"." );
       System.out.println( "If that's not the correct template directory, rerun Rdfstore with commandline -templates <path to template directory>" );
       System.out.println( "Please also make sure Java has permission to view the directory." );
       System.out.println( "" );
@@ -384,7 +384,7 @@ public class Rdfstore
     try
     {
       t.text = new Scanner(f).useDelimiter("\\A").next();
-      t.name = f.getName();
+      t.name = parse_template_name(f.getName());
     }
     catch ( Exception e )
     {
@@ -398,6 +398,18 @@ public class Rdfstore
     }
 
     templates.add( t );
+  }
+
+  public String parse_template_name( String x )
+  {
+    String retval;
+
+    if ( x.length() > 4 && x.substring( x.length() - 4 ).equals( ".txt" ) )
+      retval = x.substring( 0, x.length() - 4 );
+    else
+      retval = x;
+
+    return retval;
   }
 
   public void parse_commandline(Rdfstore r, String [] args)
