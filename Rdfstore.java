@@ -74,7 +74,7 @@ public class Rdfstore
     }
 
     for ( Sparql_template t : templates )
-      srv.createContext( "/"+t.name, new Rdfstore_NetHandler(this, t) );
+      srv.createContext( "/"+t.url, new Rdfstore_NetHandler(this, t) );
 
     srv.createContext( "/gui", new Rdfstore_NetHandler(this) );
 
@@ -92,6 +92,7 @@ public class Rdfstore
   {
     public String text;
     public String name;
+    public String url;
   }
 
   static class Rdfstore_NetHandler implements HttpHandler
@@ -130,7 +131,7 @@ public class Rdfstore
       String response, req;
       try
       {
-        req = t.getRequestURI().toString().substring(3+tmplt.name.length());
+        req = t.getRequestURI().toString().substring(3+tmplt.url.length());
       }
       catch(Exception e)
       {
@@ -385,22 +386,23 @@ public class Rdfstore
     {
       t.text = new Scanner(f).useDelimiter("\\A").next();
       t.name = parse_template_name(f.getName());
+      t.url = parse_template_url(f.getName());
     }
     catch ( Exception e )
     {
       e.printStackTrace();
     }
 
-    if ( t.name.contains( " " ) || t.name.contains( "/" ) || t.name.contains( "\\" ) )
+    if ( t.url.contains( " " ) || t.url.contains( "/" ) || t.url.contains( "\\" ) )
     {
-      System.out.println( "Warning: Template file \""+t.name+"\" contains illegal characters and is not being added as a template." );
+      System.out.println( "Warning: Template file \""+f.getName()+"\" contains illegal characters in its name, and is not being added as a template." );
       return;
     }
 
     templates.add( t );
   }
 
-  public String parse_template_name( String x )
+  public String parse_template_url( String x )
   {
     String retval;
 
@@ -408,6 +410,15 @@ public class Rdfstore
       retval = x.substring( 0, x.length() - 4 );
     else
       retval = x;
+
+    return retval;
+  }
+
+  public String parse_template_name( String x )
+  {
+    String retval = parse_template_url( x );
+
+    retval = retval.replace("_", " ");
 
     return retval;
   }
@@ -608,7 +619,7 @@ public class Rdfstore
 
     String the_menu = "<select id='pulldown' onchange='pulldownchange();'><option value='nosubmit' selected='selected'>Choose Template</option>";
     for ( Sparql_template tmplt : r.templates )
-      the_menu += "<option value='"+tmplt.name+"'>"+tmplt.name+"</option>";
+      the_menu += "<option value='"+tmplt.url+"'>"+tmplt.name+"</option>";
 
     the_menu += "</select>";
 
@@ -618,10 +629,10 @@ public class Rdfstore
     for ( Sparql_template tmplt : r.templates )
     {
       if ( tmplt.text.matches("(?s).*\\[[0-9]\\].*") == false )
-        ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    hide_input_boxes();\n  else\n";
+        ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n    hide_input_boxes();\n  else\n";
       else
       {
-        ifchecks += "  if ( templatename == '"+tmplt.name+"' )\n    show_input_boxes('";
+        ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n    show_input_boxes('";
         for ( int i = 0; i <= 9; i++ )
         {
           if ( tmplt.text.contains("["+i+"]") )
