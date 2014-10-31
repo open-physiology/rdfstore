@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -33,33 +32,27 @@ public class Rdfstore
    * Variables not specified by command-line
    */
   ArrayList<Sparql_template> templates;
-  URL SparqlURL;
+
+  public class Sparql_template
+  {
+    public String text;
+    public String name;
+    public String url;
+  }
 
   public static void main(String [] args) throws Exception
   {
-    //String x = "Testin\ng [5] Testing";
-    //if ( x.matches("(?s).*\\[5\\].*") )
-      //System.out.println("T");
-    //else
-      //System.out.println("F");
-
     Rdfstore r = new Rdfstore();
     r.run(args);
   }
 
   public void run(String [] args)
   {
-    /*
-     * Initialize Rdfstore (including reading template files)
-     */
-    init_rdfstore(this,args);
+    init_rdfstore(args);
 
     if ( help_only == true )
       return;
 
-    /*
-     * Launch server
-     */
     System.out.println( "Initiating server..." );
 
     HttpServer srv;
@@ -69,14 +62,14 @@ public class Rdfstore
     }
     catch( Exception e )
     {
-      System.out.println( "Unable to initiate server!  Is the port already in use?" );
+      System.out.println( "Unable to initiate server.  Is the port already in use?" );
       return;
     }
 
     for ( Sparql_template t : templates )
-      srv.createContext( "/"+t.url, new Rdfstore_NetHandler(this, t) );
+      srv.createContext( "/"+t.url, new Rdfstore_NetHandler( t ) );
 
-    srv.createContext( "/gui", new Rdfstore_NetHandler(this) );
+    srv.createContext( "/gui", new Rdfstore_NetHandler( null ) );
 
     srv.setExecutor(null);
     srv.start();
@@ -88,356 +81,34 @@ public class Rdfstore
      */
   }
 
-  public class Sparql_template
+  public void init_rdfstore(String [] args)
   {
-    public String text;
-    public String name;
-    public String url;
-  }
+    parse_commandline(args);
 
-  static class Rdfstore_NetHandler implements HttpHandler
-  {
-    Rdfstore r;
-    Sparql_template tmplt;
-
-    public Rdfstore_NetHandler(Rdfstore r, Sparql_template t)
-    {
-      this.r = r;
-      this.tmplt = t;
-    }
-
-    public Rdfstore_NetHandler(Rdfstore r)
-    {
-      this.r = r;
-      this.tmplt = null;  /// GUI
-    }
-
-    public void handle(HttpExchange t) throws IOException
-    {
-      Headers requestHeaders = t.getRequestHeaders();
-
-      if ( this.tmplt == null )
-      {
-        send_gui(t,r);
-        return;
-      }
-
-      int fJson;
-      if ( requestHeaders.get("Accept") != null && requestHeaders.get("Accept").contains("application/json") )
-        fJson = 1;
-      else
-        fJson = 0;
-
-      String response, req;
-      try
-      {
-        req = t.getRequestURI().toString().substring(3+tmplt.url.length());
-      }
-      catch(Exception e)
-      {
-        req = "";
-      }
-
-      Map<String, String> params = get_args(req);
-
-      System.out.println( "Got request:" );
-      for ( Map.Entry<String,String> entry : params.entrySet() )
-        System.out.print( "["+entry.getKey()+"]=["+entry.getValue()+"] " );
-      System.out.print("\n");
-
-      String query = tmplt.text;
-      for ( Map.Entry<String,String> entry : params.entrySet() )
-      {
-        if ( entry.getValue() == "" && entry.getKey() != "" )
-        {
-          send_response( t, "Error: An entry in the template was left blank." );
-          return;
-        }
-        query = query.replace("["+entry.getKey()+"]", entry.getValue());
-      }
-
-      if ( query.matches("(?s).*\\[[0-9]\\].*") )
-      {
-        for ( int i = 0; i <= 9; i++ )
-        {
-          if ( query.matches("(?s).*\\["+i+"\\].*" ) )
-          {
-            send_response( t, "Error: Template entry "+i+" is missing" );
-            return;
-          }
-        }
-      }
-
-      String sparql_answer;
-
-      if ( is_update_query(query) )
-      {
-        if ( r.sparql_update_method.equals("get") )
-          sparql_answer = sparql_query_using_get(r,query,r.sparql_update_addy);
-        else
-          sparql_answer = sparql_query_using_post(r,query,r.sparql_update_addy,"update");
-      }
-      else
-      {
-        if ( r.sparql_method.equals("get") )
-          sparql_answer = sparql_query_using_get(r,query,r.sparql_addy);
-        else
-          sparql_answer = sparql_query_using_post(r,query,r.sparql_addy,"query");
-      }
-
-      sparql_answer = escapeHTML(sparql_answer);
-
-      if ( sparql_answer.charAt(0) == '?' )
-      {
-        if ( sparql_answer.contains("\n") )
-          sparql_answer = sparql_answer.substring(sparql_answer.indexOf("\n"));
-      }
-
-      if ( sparql_answer.trim().length() == 0 )
-        sparql_answer = "No results.";
-
-      send_response( t, "<pre>"+sparql_answer+"</pre>" );
-    }
-
-    public void send_server_error(HttpExchange t)
-    {
-      send_response( t, "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with the sparql endpoint." );
-    }
-
-    public static String sparql_query_using_post(Rdfstore r, String query, String url, String keyname)
-    {
-      try
-      {
-        StringBuilder postData = new StringBuilder();
-        postData.append(keyname+"="+URLEncoder.encode(query, "UTF-8"));
-        byte[] postDataBytes = postData.toString().getBytes("UTF-8");
-
-        URL u = new URL(url);
-        HttpURLConnection c = (HttpURLConnection) u.openConnection();
-        c.setRequestMethod("POST");
-        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        c.setRequestProperty("Content-Length", String.valueOf(postDataBytes.length));
-        c.setDoOutput(true);
-        c.getOutputStream().write(postDataBytes);
-
-        Reader in = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
-        StringBuilder answer = new StringBuilder();
-        for ( int x; (x = in.read()) >= 0; answer.append((char)x) );
-        return answer.toString();
-      }
-      catch( Exception e )
-      {
-        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
-      }
-    }
-
-    public static String sparql_query_using_get(Rdfstore r, String query, String url)
-    {
-      URL u;
-      HttpURLConnection c;
-      String encoded=null;
-      try
-      {
-        u = new URL(url + URLEncoder.encode(query,"UTF-8"));
-        c = (HttpURLConnection) u.openConnection();
-
-        c.setConnectTimeout(2000); //To do: make this configurable.
-        c.setReadTimeout(5000);  //This too.
-      }
-      catch(Exception e)
-      {
-        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
-      }
-
-      Scanner sc=null;
-      try
-      {
-        sc = new Scanner(c.getInputStream());
-      }
-      catch(Exception e)
-      {
-        return "500 Server Error.  Most likely, what this means is that Ricordo Rdfstore couldn't communicate with your sparql endpoint.";
-      }
-
-      return sc.useDelimiter("\\A").next();
-    }
-
-    /*
-     * escapeHTML thanks to Bruno Eberhard
-     */
-    public static String escapeHTML(String s)
-    {
-      StringBuilder out = new StringBuilder(Math.max(16, s.length()));
-
-      for (int i = 0; i < s.length(); i++)
-      {
-        char c = s.charAt(i);
-
-        if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&')
-        {
-          out.append("&#");
-          out.append((int) c);
-          out.append(';');
-        }
-        else
-          out.append(c);
-      }
-      return out.toString();
-    }
-  }
-
-  static public void send_response( HttpExchange t, String response )
-  {
-    try
-    {
-      Headers h = t.getResponseHeaders();
-      h.add("Cache-Control", "no-cache, no-store, must-revalidate");
-      h.add("Pragma", "no-cache");
-      h.add("Expires", "0");
-
-      t.sendResponseHeaders(200,response.getBytes().length);
-      OutputStream os = t.getResponseBody();
-      os.write(response.getBytes());
-      os.close();
-    }
-    catch(Exception e)
-    {
-      ;
-    }
-  }
-
-
-  public void init_rdfstore(Rdfstore r, String [] args)
-  {
-    parse_commandline(r, args);
-
-    try
-    {
-      r.SparqlURL = new URL(r.sparql_addy);
-    }
-    catch(Exception e)
-    {
-      System.out.println( "Unable to create URL object for "+r.sparql_addy+"." );
-      System.out.println( "If that's not the correct address for your sparql endpoint, rerun with commandline argument -endpoint <address>." );
-      r.help_only = true;
-      return;
-    }
-
-    if ( r.help_only == true )
+    if ( help_only == true )
       return;
 
     load_template_files();
   }
 
-  public void load_template_files()
+  public void parse_commandline( String [] args )
   {
-    File folder;
-    File[] templatefiles = null;
-
-    try
-    {
-      folder = new File(template_dir);
-      templatefiles = folder.listFiles();
-    }
-    catch( Exception e )
-    {
-      folder = null;
-    }
-
-    if ( folder == null || templatefiles == null )
-    {
-      System.out.println( "Couldn't open SPARQL template directory "+template_dir+"." );
-      System.out.println( "If that's not the correct template directory, rerun Rdfstore with commandline -templates <path to template directory>" );
-      System.out.println( "Please also make sure Java has permission to view the directory." );
-      System.out.println( "" );
-      help_only = true;
-      return;
-    }
-
-    System.out.println( "Loading templates..." );
-
-    boolean fFile = false;
-    templates = new ArrayList<Sparql_template>();
-
-    for ( File f : templatefiles )
-    {
-      if ( f.isFile() )
-      {
-        add_template( f );
-        fFile = true;
-      }
-    }
-
-    if ( fFile == false )
-    {
-      System.out.println( "The SPARQL template directory, "+template_dir+", does not seem to contain any template files!" );
-      System.out.println( "If that's not the correct template directory rerun Rdfstore with commandline -template <path to template directory>" );
-      System.out.println( "" );
-      help_only = true;
-      return;
-    }
-  }
-
-  public void add_template( File f )
-  {
-    Sparql_template t = new Sparql_template();
-
-    try
-    {
-      t.text = new Scanner(f).useDelimiter("\\A").next();
-      t.name = parse_template_name(f.getName());
-      t.url = parse_template_url(f.getName());
-    }
-    catch ( Exception e )
-    {
-      e.printStackTrace();
-    }
-
-    if ( t.url.contains( " " ) || t.url.contains( "/" ) || t.url.contains( "\\" ) )
-    {
-      System.out.println( "Warning: Template file \""+f.getName()+"\" contains illegal characters in its name, and is not being added as a template." );
-      return;
-    }
-
-    templates.add( t );
-  }
-
-  public String parse_template_url( String x )
-  {
-    String retval;
-
-    if ( x.length() > 4 && x.substring( x.length() - 4 ).equals( ".txt" ) )
-      retval = x.substring( 0, x.length() - 4 );
-    else
-      retval = x;
-
-    return retval;
-  }
-
-  public String parse_template_name( String x )
-  {
-    String retval = parse_template_url( x );
-
-    retval = retval.replace("_", " ");
-
-    return retval;
-  }
-
-  public void parse_commandline(Rdfstore r, String [] args)
-  {
-    r.template_dir = "./templates";
-    r.help_only = false;
-    r.sparql_addy = "http://localhost";
-    r.sparql_update_addy = "http://localhost";
-    r.sparql_method = "get";
-    r.sparql_update_method = "get";
-    r.sparql_fmt = "%s";
-    r.port = 20060;
+    /*
+     * Set default values
+     */
+    template_dir = "./templates";
+    help_only = false;
+    sparql_addy = "http://localhost";
+    sparql_update_addy = "http://localhost";
+    sparql_method = "get";
+    sparql_update_method = "get";
+    sparql_fmt = "%s";
+    port = 20060;
 
     int i;
     String flag;
-    int fSparqlUpdateAddy = 0;
-    int fSparqlUpdateMethod = 0;
+    boolean fSparqlUpdateAddy = false;
+    boolean fSparqlUpdateMethod = false;
 
     for ( i = 0; i < args.length; i++ )
     {
@@ -488,7 +159,7 @@ public class Rdfstore
         System.out.println( "-help"                                                 );
         System.out.println( "(Displays this helpfile)"                              );
         System.out.println();
-        r.help_only = true;
+        help_only = true;
         return;
       }
 
@@ -497,89 +168,106 @@ public class Rdfstore
         if ( i+1 >= args.length )
         {
           System.out.println( "Specify a path to a directory containing sparql template files." );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.template_dir = args[++i];
-        System.out.println( "Using "+r.template_dir+" as template directory." );
+        template_dir = args[++i];
+        System.out.println( "Using "+template_dir+" as template directory." );
+        continue;
       }
-      else if ( flag.equals("addy") || flag.equals("address") || flag.equals("sparql_addy") || flag.equals("sparql_address") || flag.equals("endpt") || flag.equals("endpoint") )
+
+      if ( flag.equals("addy") || flag.equals("address") || flag.equals("sparql_addy") || flag.equals("sparql_address") || flag.equals("endpt") || flag.equals("endpoint") )
       {
         if ( i+1 >= args.length )
         {
           System.out.println( "Specify the address of the SPARQL query endpoint." );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.sparql_addy = args[++i];
-        System.out.println( "Using "+r.sparql_addy+" as SPARQL query endpoint." );
+        sparql_addy = args[++i];
+        System.out.println( "Using "+sparql_addy+" as SPARQL query endpoint." );
 
-        if ( fSparqlUpdateAddy == 0 )
-          r.sparql_update_addy = r.sparql_addy;
+        if ( fSparqlUpdateAddy == false )
+          sparql_update_addy = sparql_addy;
+
+        continue;
       }
-      else if ( flag.equals("update" ) || flag.equals("upd") )
+
+      if ( flag.equals("update" ) || flag.equals("upd") )
       {
-        fSparqlUpdateAddy = 1;
+        fSparqlUpdateAddy = true;
 
         if ( i+1 >= args.length )
         {
           System.out.println( "Specify the address of the sparql update endpoint." );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.sparql_update_addy = args[++i];
-        System.out.println( "Using "+r.sparql_update_addy+" as SPARQL update endpoint." );
+        sparql_update_addy = args[++i];
+        System.out.println( "Using "+sparql_update_addy+" as SPARQL update endpoint." );
+
+        continue;
       }
-      else if ( flag.equals("method") || flag.equals("mthd") || flag.equals("sparql_method") )
+
+      if ( flag.equals("method") || flag.equals("mthd") || flag.equals("sparql_method") )
       {
         if ( i+1 >= args.length || (!args[i+1].equals("get") && !args[i+1].equals("post") && !args[i+1].equals("GET") && !args[i+1].equals("POST")) )
         {
           System.out.println( "Valid methods are:  GET, or POST" );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.sparql_method = args[++i].toLowerCase();
+        sparql_method = args[++i].toLowerCase();
         System.out.println( "Using "+args[i]+" as SPARQL query HTTP method" );
 
-        if ( fSparqlUpdateMethod == 0 )
-          r.sparql_update_method = r.sparql_method;
+        if ( fSparqlUpdateMethod == false )
+          sparql_update_method = sparql_method;
+
+        continue;
       }
-      else if ( flag.equals("updatemethod") || flag.equals("update_method") || flag.equals("updatemthd") || flag.equals("update_mthd") )
+
+      if ( flag.equals("updatemethod") || flag.equals("update_method") || flag.equals("updatemthd") || flag.equals("update_mthd") )
       {
-        fSparqlUpdateMethod = 1;
+        fSparqlUpdateMethod = true;
 
         if ( i+1 >= args.length || (!args[i+1].equals("get") && !args[i+1].equals("post") && !args[i+1].equals("GET") && !args[i+1].equals("POST")) )
         {
           System.out.println( "Valid update methods are:  GET, or POST" );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.sparql_update_method = args[++i].toLowerCase();
+        sparql_update_method = args[++i].toLowerCase();
         System.out.println( "Using "+args[i]+" as SPARQL update HTTP method" );
+
+        continue;
       }
-      else if ( flag.equals("fmt") || flag.equals("format") || flag.equals("sparql_fmt") || flag.equals("sparql_format") )
+
+      if ( flag.equals("fmt") || flag.equals("format") || flag.equals("sparql_fmt") || flag.equals("sparql_format") )
       {
         if ( i+1 >= args.length || !args[i+1].contains("%s") )
         {
           System.out.println( "Specify a format for sparql queries.  The format should be a string, with \"%s\" where you want the actual query itself to be filled in." );
-          r.help_only = true;
+          help_only = true;
           return;
         }
-        r.sparql_fmt = args[++i];
-        System.out.println( "Using "+r.sparql_fmt+" as sparql format." );
+        sparql_fmt = args[++i];
+        System.out.println( "Using "+sparql_fmt+" as sparql format." );
+
+        continue;
       }
-      else if ( flag.equals("port") || flag.equals("p") )
+
+      if ( flag.equals("port") || flag.equals("p") )
       {
         if ( i+1 < args.length )
         {
           try
           {
-            r.port = Integer.parseInt(args[i+1]);
+            port = Integer.parseInt(args[i+1]);
           }
           catch( Exception e )
           {
             System.out.println( "Port must be a number." );
-            r.help_only = true;
+            help_only = true;
             return;
           }
           System.out.println( "Rircordo Rdfstore will listen on port "+args[++i] );
@@ -587,27 +275,338 @@ public class Rdfstore
         else
         {
           System.out.println( "Which port do you want the server to listen on?" );
-          r.help_only = true;
+          help_only = true;
           return;
         }
+
+        continue;
       }
-      else if ( flag.equals("get") || flag.equals("post") )
+
+      if ( flag.equals("get") || flag.equals("post") )
       {
         String [] reargs = {"method", flag};
-        parse_commandline( r, reargs );
+        parse_commandline( reargs );
+        continue;
       }
+
+      System.out.println( "Unknown command-line argument: \""+flag+"\"" );
+      help_only = true;
+      return;
     }
   }
 
-  public static void send_gui(HttpExchange t, Rdfstore r)
+  public void load_template_files( )
   {
-    String the_html;
-    String the_js;
+    File folder;
+    File[] templatefiles = null;
+
+    try
+    {
+      folder = new File(template_dir);
+      templatefiles = folder.listFiles();
+    }
+    catch(Exception e)
+    {
+      folder = null;
+    }
+
+    if ( folder == null || templatefiles == null )
+    {
+      System.out.println( "Couldn't open SPARQL template directory "+template_dir+"." );
+      System.out.println( "If that's not the correct template directory, rerun Rdfstore with commandline -templates <path to template directory>" );
+      System.out.println( "Please also make sure Java has permission to view the directory." );
+      System.out.println( "" );
+      help_only = true;
+      return;
+    }
+
+    System.out.println( "Loading templates..." );
+
+    boolean fFile = false;
+    templates = new ArrayList<Sparql_template>();
+
+    for ( File f : templatefiles )
+    {
+      if ( f.isFile() )
+      {
+        add_template( f );
+        fFile = true;
+      }
+    }
+
+    if ( fFile = false )
+    {
+      System.out.println( "The SPARQL template directory, "+template_dir+", does not seem to contain any template files!" );
+      System.out.println( "If that's not the correct template directory rerun Rdfstore with commandline -template <path to template directory>" );
+      System.out.println( "" );
+      help_only = true;
+    }
+  }
+
+  public void add_template( File f )
+  {
+    Sparql_template t = new Sparql_template();
+
+    try
+    {
+      t.text = new Scanner(f).useDelimiter("\\A").next();
+      t.name = parse_template_name(f.getName());
+      t.url = parse_template_url(f.getName());
+    }
+    catch( Exception e )
+    {
+      e.printStackTrace();
+    }
+
+    if ( t.url.contains( " " ) || t.url.contains( "/" ) || t.url.contains( "\\" ) )
+    {
+      System.out.println( "Warning: Template file \""+f.getName()+"\" contains illegal characters in its name, and is not being added as a template." );
+      return;
+    }
+
+    templates.add( t );
+  }
+
+  public String parse_template_url( String x )
+  {
+    String retval;
+
+    if ( x.length() > 4 && x.substring( x.length() - 4 ).equals( ".txt" ) )
+      retval = x.substring( 0, x.length() - 4 );
+    else
+      retval = x;
+
+    return retval;
+  }
+
+  public String parse_template_name( String x )
+  {
+    String retval = parse_template_url( x );
+
+    retval = retval.replace("_", " ");
+
+    return retval;
+  }
+
+  class Rdfstore_NetHandler implements HttpHandler
+  {
+    Sparql_template tmplt;
+
+    public Rdfstore_NetHandler( Sparql_template t )
+    {
+      this.tmplt = t;
+    }
+
+    public void handle(HttpExchange t) throws IOException
+    {
+      Headers requestHeaders = t.getRequestHeaders();
+
+      if ( this.tmplt == null )
+      {
+        send_gui( t );
+        return;
+      }
+
+      boolean fJson;
+      if ( requestHeaders.get("Accept") != null && requestHeaders.get("Accept").contains("application/json") )
+        fJson = true;
+      else
+        fJson = false;
+
+      String response, req;
+      try
+      {
+        req = t.getRequestURI().toString().substring(3+tmplt.url.length());
+      }
+      catch(Exception e)
+      {
+        req = "";
+      }
+
+      Map<String, String> params = get_args(req);
+
+      /*
+       * Uncomment for debugging purposes:
+       *
+      System.out.println( "Got request:" );
+      for ( Map.Entry<String,String> entry : params.entrySet() )
+        System.out.print( "["+entry.getKey()+"]=["+entry.getValue()+"] " );
+      System.out.print("\n");
+       *
+       */
+
+      String query = tmplt.text;
+      for ( Map.Entry<String,String> entry : params.entrySet() )
+      {
+        if ( entry.getValue() == "" && entry.getKey() != "" )
+        {
+          send_response( t, "Error: An entry in the template was left blank." );
+          return;
+        }
+        query = query.replace("["+entry.getKey()+"]", entry.getValue());
+      }
+
+      if ( query.matches("(?s).*\\[[0-9]\\].*") )
+      {
+        for ( int i = 0; i <= 9; i++ )
+        {
+          if ( query.matches("(?s).*\\["+i+"\\].*" ) )
+          {
+            send_response( t, "Error: Template entry "+i+" is missing" );
+            return;
+          }
+        }
+      }
+
+      String sparql_answer;
+
+      if ( is_update_query(query) )
+      {
+        if ( sparql_update_method.equals("get") )
+          sparql_answer = sparql_query_using_get(query, sparql_update_addy);
+        else
+          sparql_answer = sparql_query_using_post(query, sparql_update_addy, "update");
+      }
+      else
+      {
+        if ( sparql_method.equals("get") )
+          sparql_answer = sparql_query_using_get(query, sparql_addy);
+        else
+          sparql_answer = sparql_query_using_post(query, sparql_addy, "query");
+      }
+
+      sparql_answer = escapeHTML(sparql_answer);
+
+      if ( sparql_answer.charAt(0) == '?' )
+      {
+        if ( sparql_answer.contains("\n") )
+          sparql_answer = sparql_answer.substring(sparql_answer.indexOf("\n") );
+      }
+
+      if ( sparql_answer.trim().length() == 0 )
+        sparql_answer = "No results.";
+
+      send_response( t, "<pre>"+sparql_answer+"</pre>" );
+    }
+
+    public String sparql_query_using_post( String query, String url, String keyname )
+    {
+      try
+      {
+        StringBuilder postData = new StringBuilder();
+        postData.append(keyname+"="+URLEncoder.encode(query, "UTF-8"));
+        byte[] postDataBytes = postData.toString().getBytes("UTF-8");
+
+        URL u = new URL(url);
+        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+        c.setRequestMethod("POST");
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        c.setRequestProperty("Content-Length", String.valueOf(postDataBytes.length));
+        c.setDoOutput(true);
+        c.getOutputStream().write(postDataBytes);
+
+        Reader in = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
+        StringBuilder answer = new StringBuilder();
+        for ( int x; (x = in.read()) >= 0; answer.append((char)x) );
+        return answer.toString();
+      }
+      catch( Exception e )
+      {
+        return "500 Server Error.  Most likely, Rdfstore couldn't communicate with the SPARQL endpoint.";
+      }
+    }
+
+    public String sparql_query_using_get(String query, String url)
+    {
+      URL u;
+      HttpURLConnection c;
+      String encoded = null;
+
+      try
+      {
+        u = new URL(url + URLEncoder.encode(query, "UTF-8") );
+        c = (HttpURLConnection) u.openConnection();
+
+        c.setConnectTimeout(2000);  // To do: make this configurable.
+        c.setReadTimeout(5000);     // This too.
+      }
+      catch(Exception e)
+      {
+        try
+        {
+          return "500 Server Error.  Rdfstore couldn't resolve the URL: "+url+URLEncoder.encode(query,"UTF-8")+".";
+        }
+        catch(Exception e2)
+        {
+          return "500 Server Error.  Rdfstore couldn't resolve the url to connect to the triplestore.";
+        }
+      }
+
+      Scanner sc = null;
+      try
+      {
+        sc = new Scanner(c.getInputStream( ) );
+      }
+      catch(Exception e)
+      {
+        return "500 Server Error.  Most likely, Rdfstore couldn't communicate with the SPARQL endpoint.";
+      }
+
+      return sc.useDelimiter("\\A").next();
+    }
+
+    /*
+     * escapeHTML thanks to Bruno Eberhard
+     */
+    public String escapeHTML(String s)
+    {
+      StringBuilder out = new StringBuilder(Math.max(16, s.length()));
+
+      for (int i = 0; i < s.length(); i++)
+      {
+        char c = s.charAt(i);
+
+        if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&')
+        {
+          out.append("&#");
+          out.append((int) c);
+          out.append(';');
+        }
+        else
+          out.append(c);
+      }
+      return out.toString();
+    }
+  }
+
+  static public void send_response( HttpExchange t, String response )
+  {
+    try
+    {
+      Headers h = t.getResponseHeaders();
+      h.add("Cache-Control", "no-cache, no-store, must-revalidate");
+      h.add("Pragma", "no-cache");
+      h.add("Expires", "0" );
+
+      t.sendResponseHeaders(200,response.getBytes().length);
+      OutputStream os = t.getResponseBody();
+      os.write(response.getBytes());
+      os.close();
+    }
+    catch(Exception e)
+    {
+      ;
+    }
+  }
+
+  public void send_gui( HttpExchange t )
+  {
+    String the_html, the_js;
 
     try
     {
       the_html = new Scanner(new File("gui.php")).useDelimiter("\\A").next();
-      the_js   = new Scanner(new File("gui.js")).useDelimiter("\\A").next();
+      the_js = new Scanner(new File("gui.js")).useDelimiter("\\A").next();
     }
     catch(Exception e)
     {
@@ -618,15 +617,15 @@ public class Rdfstore
     the_html = the_html.replace("@JAVASCRIPT", "<script type='text/javascript'>"+the_js+"</script>");
 
     String the_menu = "<select id='pulldown' onchange='pulldownchange();'><option value='nosubmit' selected='selected'>Choose Template</option>";
-    for ( Sparql_template tmplt : r.templates )
+    for ( Sparql_template tmplt : templates )
       the_menu += "<option value='"+tmplt.url+"'>"+tmplt.name+"</option>";
 
     the_menu += "</select>";
 
-    the_html = the_html.replace("@PULLDOWNMENU", the_menu);
+    the_html = the_html.replace( "@PULLDOWNMENU", the_menu );
 
     String ifchecks = "if ( templatename == 'nosubmit' )\n    hide_input_boxes();\n  else\n";
-    for ( Sparql_template tmplt : r.templates )
+    for ( Sparql_template tmplt : templates )
     {
       if ( tmplt.text.matches("(?s).*\\[[0-9]\\].*") == false )
         ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n    hide_input_boxes();\n  else\n";
@@ -643,7 +642,6 @@ public class Rdfstore
     }
 
     ifchecks += "    hide_input_boxes();\n";
-
     ifchecks += "  if ( templatename == 'nosubmit' )\n    hide_input_button();\n  else\n    show_input_button();";
 
     the_html = the_html.replace("@CHANGESELECTIONCODE", ifchecks);
