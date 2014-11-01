@@ -44,7 +44,7 @@ function inputkey(e)
 
 function rdfstore_run()
 {
-  var url = encodeURIComponent(g('pulldown').value)+'/';
+  var url = '/'+encodeURIComponent(g('pulldown').value)+'/';
   var fFirst = 0;
   var inputbox;
 
