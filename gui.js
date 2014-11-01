@@ -28,7 +28,7 @@ var decodeEntities = (function() {
   return decodeHTMLEntities;
 })();
 /*
- * decodeEntities ends here
+ * decodeEntities ends where
  */
 
 function g(x)
@@ -76,7 +76,7 @@ function rdfstore_run()
   xmlhttp.onreadystatechange=function()
   {
     if ( xmlhttp.readyState==4 && xmlhttp.status==200 )
-      g("rdfstore_results").innerHTML = xmlhttp.responseText;
+      g("rdfstore_results").innerHTML = xmlhttp.responseText + "<br>Click <a target='_blank' href='" + url + "'>here</a> to run the API command directly";
     else if ( xmlhttp.readyState==4 && xmlhttp.status != 200 )
       g("rdfstore_results").innerHTML = "There was an error getting the results.  Some possible reasons:<ol><li>You entered an invalid IRI</li><li>The ricordo rdfstore server is down</li><li>The rdf store itself is down</li><li>Your internet is disconnected</li></ol>";
   }
