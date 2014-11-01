@@ -38,6 +38,7 @@ public class Rdfstore
     public String text;
     public String name;
     public String url;
+    public Map<String,String> configs;
   }
 
   public static void main(String [] args) throws Exception
@@ -364,7 +365,49 @@ public class Rdfstore
       return;
     }
 
+    t.configs = new HashMap<String,String>();
+
+    t.text = t.text.replace("\n\r", "\n");
+    t.text = t.text.replace("\r\n", "\n");
+    t.text = t.text.replace("\r", "\n" );
+    check_for_template_commands(t);
+
     templates.add( t );
+  }
+
+  public void check_for_template_commands(Sparql_template t)
+  {
+    if ( t.text.length() >= 1 && t.text.charAt(0) == '\n' )
+    {
+      t.text = t.text.substring(1,t.text.length());
+      check_for_template_commands(t);
+      return;
+    }
+
+    if ( t.text.length() < 1 || t.text.charAt(0) != '#' )
+      return;
+
+    int carriage = t.text.indexOf("\n");
+
+    if ( carriage == -1 || carriage == t.text.length()-1 )
+      return;
+
+    int equalsign = t.text.indexOf("=");
+
+    if ( equalsign <= 1 || equalsign >= carriage-1 )
+      return;
+
+    String variablename = t.text.substring(1,equalsign).trim();
+    String valuename = t.text.substring(equalsign+1,carriage).trim();
+
+    if ( variablename.length() == 0 || valuename.length() == 0 )
+      return;
+
+    t.configs.put(variablename, valuename);
+
+    t.text = t.text.substring(carriage+1,t.text.length());
+
+    check_for_template_commands(t);
   }
 
   public String parse_template_url( String x )
@@ -554,29 +597,29 @@ public class Rdfstore
 
       return sc.useDelimiter("\\A").next();
     }
+  }
 
-    /*
-     * escapeHTML thanks to Bruno Eberhard
-     */
-    public String escapeHTML(String s)
+  /*
+   * escapeHTML thanks to Bruno Eberhard
+   */
+  public String escapeHTML(String s)
+  {
+    StringBuilder out = new StringBuilder(Math.max(16, s.length()));
+
+    for (int i = 0; i < s.length(); i++)
     {
-      StringBuilder out = new StringBuilder(Math.max(16, s.length()));
+      char c = s.charAt(i);
 
-      for (int i = 0; i < s.length(); i++)
+      if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&' || c == '\'' )
       {
-        char c = s.charAt(i);
-
-        if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&')
-        {
-          out.append("&#");
-          out.append((int) c);
-          out.append(';');
-        }
-        else
-          out.append(c);
+        out.append("&#");
+        out.append((int) c);
+        out.append(';');
       }
-      return out.toString();
+      else
+        out.append(c);
     }
+    return out.toString();
   }
 
   static public void send_response( HttpExchange t, String response )
@@ -631,13 +674,26 @@ public class Rdfstore
         ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n    hide_input_boxes();\n  else\n";
       else
       {
-        ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n    show_input_boxes('";
+        ifchecks += "  if ( templatename == '"+tmplt.url+"' )\n  {\n    show_input_boxes('";
         for ( int i = 0; i <= 9; i++ )
         {
           if ( tmplt.text.contains("["+i+"]") )
             ifchecks += i;
         }
-        ifchecks += "');\n  else\n";
+        ifchecks += "');\n";
+
+        for ( int i = 0; i <= 9; i++ )
+        {
+          if ( tmplt.text.contains("["+i+"]") )
+          {
+            if ( tmplt.configs.containsKey(""+i) )
+              ifchecks += "    set_placeholder("+i+",\""+escapeHTML(tmplt.configs.get(""+i))+"\");\n";
+            else
+              ifchecks += "    clear_placeholder("+i+");\n";
+          }
+        }
+
+        ifchecks += "  }\n  else\n";
       }
     }
 

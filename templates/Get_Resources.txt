@@ -1,8 +1,13 @@
 SELECT DISTINCT ?s WHERE
 {
-  ?s ?p ?o .
+  ?s
+  ?p
+  ?o
+  .
   FILTER NOT EXISTS
   {
-    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property>
+    ?s
+    <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+    <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property>
   }
 }

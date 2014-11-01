@@ -1,2 +1,8 @@
+# 0 = Resource
 SELECT ?p ?a
-WHERE { <[0]> ?p ?a }
+WHERE
+{
+  <[0]>
+  ?p
+  ?a
+}

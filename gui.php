@@ -32,9 +32,6 @@
 
   <div class='nine columns' id='rightdiv'>
     <h2>Query using selected template</h2>
-    <div>
-      Specify which IRI to pass to the query.
-    </div>
     <hr>
     <div id='rightpadding'>
       <input id="inputbox0" onKeyUp="inputkey(event);" style="width:100%; display:none">
@@ -48,6 +45,7 @@
       <input id="inputbox8" onKeyUp="inputkey(event);" style="width:100%; display:none">
       <input id="inputbox9" onKeyUp="inputkey(event);" style="width:100%; display:none">
       <div style="visibility:hidden" id="buttondiv">
+        <br>
         <button onclick="rdfstore_run();" style="width:100%">Enter</button>
       </div>
       <div id="rdfstore_results">

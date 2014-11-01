@@ -1,1 +1,8 @@
-SELECT ?o WHERE {<[0]> <http://www.pharmml.org/2013/10/PharmMLMetadata#model-related-to-drug> ?o}
+# 0 = Model
+SELECT ?o
+WHERE
+{
+  <[0]>
+  <http://www.pharmml.org/2013/10/PharmMLMetadata#model-related-to-drug>
+  ?o
+}

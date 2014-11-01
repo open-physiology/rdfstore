@@ -1,2 +1,8 @@
-SELECT ?s WHERE {?s 
-<http://www.pharmml.org/2013/10/PharmMLMetadata#model-has-route-of-administration-attribute> <[0]>}
+# 0 = ROA
+SELECT ?s
+WHERE
+{
+  ?s 
+  <http://www.pharmml.org/2013/10/PharmMLMetadata#model-has-route-of-administration-attribute>
+  <[0]>
+}

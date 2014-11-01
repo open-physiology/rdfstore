@@ -5,6 +5,32 @@ if(typeof String.prototype.trim !== 'function') {
   }
 }
 
+/*
+ * decodeEntities provided by Robert K from stackoverflow
+ */
+var decodeEntities = (function() {
+  // this prevents any overhead from creating the object each time
+  var element = document.createElement('div');
+
+  function decodeHTMLEntities (str) {
+    if(str && typeof str === 'string') {
+      // strip script/html tags
+      str = str.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '');
+      str = str.replace(/<\/?\w(?:[^"'>]|"[^"]*"|'[^']*')*>/gmi, '');
+      element.innerHTML = str;
+      str = element.textContent;
+      element.textContent = '';
+    }
+
+    return str;
+  }
+
+  return decodeHTMLEntities;
+})();
+/*
+ * decodeEntities ends here
+ */
+
 function g(x)
 {
  return document.getElementById(x);
@@ -100,4 +126,14 @@ function hide_input_button()
 function show_input_button()
 {
   g("buttondiv").style.visibility = 'visible';
+}
+
+function clear_placeholder(n)
+{
+  g("inputbox"+n).placeholder = "";
+}
+
+function set_placeholder(n,x)
+{
+  g("inputbox"+n).placeholder = decodeEntities(x);
 }

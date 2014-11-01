@@ -1,0 +1,2 @@
+# 0 = SPARQL Command
+[0]
