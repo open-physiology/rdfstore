@@ -26,6 +26,7 @@ public class Rdfstore
   public String sparql_update_addy;   // Address where to send sparql updates to.  Default: Mimic sparql_addy
   public String sparql_update_method; // Method to use for sparql updates (get or post).  Default: Mimic sparql_method
   public String sparql_fmt;           // Format to apply to sparl queries.  Default: %s
+  public String preprocessor;         // URL of a service that will preprocess template entries
   public int port;                    // Port for Ricord Rdfstore.java server to listen on.  Default: 20060
 
   /*
@@ -105,6 +106,7 @@ public class Rdfstore
     sparql_update_method = "get";
     sparql_fmt = "%s";
     port = 20060;
+    preprocessor = null;
 
     int i;
     String flag;
@@ -152,6 +154,13 @@ public class Rdfstore
         System.out.println( " sent to the sparql endpoint.  Good for things like"   );
         System.out.println( " triplestore-specific preambles, etc.)"                );
         System.out.println( "(Default: %s)"                                         );
+        System.out.println( "------------------------------------"                  );
+        System.out.println( "-preprocessor <URL>"                                   );
+        System.out.println( "(URL pointing to a preprocessor.  If this is set,"     );
+        System.out.println( "all form entries will be routed through that"          );
+        System.out.println( "preprocessor, which might mutate them, before they"    );
+        System.out.println( "are used in SPARQL.  See documentation for details.)"  );
+        System.out.println( "(Default: none)"                                       );
         System.out.println( "------------------------------------"                  );
         System.out.println( "-port <number>"                                        );
         System.out.println( "(Which port should this Rdfstore program listen on?)"  );
@@ -263,7 +272,7 @@ public class Rdfstore
         {
           try
           {
-            port = Integer.parseInt(args[i+1]);
+            port = Integer.parseInt(args[++i]);
           }
           catch( Exception e )
           {
@@ -280,6 +289,19 @@ public class Rdfstore
           return;
         }
 
+        continue;
+      }
+
+      if ( flag.equals("preprocessor") || flag.equals("preproc") )
+      {
+        if ( i+1 >= args.length )
+        {
+          System.out.println( "Specify the URL of the preprocessor you want Rdfstore to use." );
+          help_only = true;
+          return;
+        }
+        preprocessor = args[++i];
+        System.out.println( "Using "+preprocessor+" as preprocessor." );
         continue;
       }
 
@@ -486,7 +508,11 @@ public class Rdfstore
           send_response( t, "Error: An entry in the template was left blank." );
           return;
         }
-        query = query.replace("["+entry.getKey()+"]", entry.getValue());
+
+        if ( preprocessor != null )
+          query = query.replace("["+entry.getKey()+"]", call_preprocessor( preprocessor, entry.getValue() ) );
+        else
+          query = query.replace("["+entry.getKey()+"]", entry.getValue());
       }
 
       if ( query.matches("(?s).*\\[[0-9]\\].*") )
@@ -495,7 +521,11 @@ public class Rdfstore
         {
           if ( query.matches("(?s).*\\["+i+"\\].*" ) )
           {
-            send_response( t, "Error: Template entry "+i+" is missing" );
+            if ( tmplt.configs.containsKey(""+i) )
+              send_response( t, "Error: Template entry '"+escapeHTML(tmplt.configs.get(""+i))+"' is missing" );
+            else
+              send_response( t, "Error: Template entry "+i+" is missing" );
+
             return;
           }
         }
@@ -755,5 +785,10 @@ public class Rdfstore
       return true;
 
     return false;
+  }
+
+  public String call_preprocessor( String url, String orig )
+  {
+    return orig;
   }
 }
