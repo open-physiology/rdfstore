@@ -510,7 +510,17 @@ public class Rdfstore
         }
 
         if ( preprocessor != null )
-          query = query.replace("["+entry.getKey()+"]", call_preprocessor( preprocessor, entry.getValue() ) );
+        {
+          String processed = call_preprocessor( preprocessor, entry.getValue() );
+
+          if ( processed == null )
+          {
+            send_response( t, "Error: Rdfstore could not communicate with its internal preprocessor" );
+            return;
+          }
+
+          query = query.replace("["+entry.getKey()+"]", processed );
+        }
         else
           query = query.replace("["+entry.getKey()+"]", entry.getValue());
       }
@@ -789,6 +799,36 @@ public class Rdfstore
 
   public String call_preprocessor( String url, String orig )
   {
-    return orig;
+    URL u;
+    HttpURLConnection c;
+    String orig_encoded;
+
+    try
+    {
+      u = new URL(url + URLEncoder.encode(orig, "UTF-8") );
+      c = (HttpURLConnection) u.openConnection();
+
+      /*
+       * To do: make these configurable
+       */
+      c.setConnectTimeout(2000);
+      c.setReadTimeout(5000);
+    }
+    catch(Exception e)
+    {
+      return null;
+    }
+
+    Scanner sc = null;
+    try
+    {
+      sc = new Scanner(c.getInputStream() );
+    }
+    catch(Exception e)
+    {
+      return null;
+    }
+
+    return sc.useDelimiter("\\A").next();
   }
 }
