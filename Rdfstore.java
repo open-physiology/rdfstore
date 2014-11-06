@@ -510,17 +510,7 @@ public class Rdfstore
         }
 
         if ( preprocessor != null )
-        {
-          String processed = call_preprocessor( preprocessor, entry.getValue() );
-
-          if ( processed == null )
-          {
-            send_response( t, "Error: Rdfstore could not communicate with its internal preprocessor" );
-            return;
-          }
-
-          query = query.replace("["+entry.getKey()+"]", processed );
-        }
+          query = query.replace("["+entry.getKey()+"]", call_preprocessor( preprocessor, entry.getValue() ) );
         else
           query = query.replace("["+entry.getKey()+"]", entry.getValue());
       }
@@ -603,7 +593,6 @@ public class Rdfstore
     {
       URL u;
       HttpURLConnection c;
-      String encoded = null;
 
       try
       {
