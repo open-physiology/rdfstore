@@ -44,6 +44,7 @@ public class Rdfstore
 
   public static void main(String [] args) throws Exception
   {
+System.out.println( fill_in_multi_input( "SELECT ?x WHERE {?x <[0]> <blah>}", "<[0]>", "{hi,hello,hola}" ) );
     Rdfstore r = new Rdfstore();
     r.run(args);
   }
@@ -501,6 +502,8 @@ public class Rdfstore
        */
 
       String query = tmplt.text;
+      boolean fMultiple = false;
+
       for ( Map.Entry<String,String> entry : params.entrySet() )
       {
         if ( entry.getValue() == "" && entry.getKey() != "" )
@@ -510,7 +513,36 @@ public class Rdfstore
         }
 
         if ( preprocessor != null )
-          query = query.replace("["+entry.getKey()+"]", call_preprocessor( preprocessor, entry.getValue() ) );
+        {
+          String value = call_preprocessor( preprocessor, entry.getValue() ).trim();
+
+          if ( value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']' )
+          {
+            if ( fMultiple )
+            {
+              send_response( t, "Error: At most one form in a template is allowed to refer to multiple classes" );
+              return;
+            }
+
+            if ( !is_normalform( tmplt.text ) )
+            {
+              send_response( t, "Error: Multiple-class inputs are only allowed in templates in normal form. (See documentation)" );
+              return;
+            }
+
+            fMultiple = true;
+            query = fill_in_multi_input( query, "<["+entry.getKey()+"]>", value );
+          }
+          else
+          {
+            query = query.replace("["+entry.getKey()+"]", value );
+            if ( query.equals("No results.") )
+            {
+              send_response( t, "No results." );
+              return;
+            }
+          }
+        }
         else
           query = query.replace("["+entry.getKey()+"]", entry.getValue());
       }
@@ -819,5 +851,74 @@ public class Rdfstore
     }
 
     return sc.useDelimiter("\\A").next();
+  }
+
+  public static boolean is_normalform(String x)
+  {
+    byte[] buf;
+    int i, level=0;
+    boolean fLevel = false;
+
+    try
+    {
+      buf = x.getBytes("UTF-8");
+    }
+    catch(Exception e)
+    {
+      return false;
+    }
+
+    for ( i = 0; i < buf.length; i++ )
+    {
+      if ( buf[i] == '{' )
+      {
+        level++;
+        fLevel = true;
+      }
+      else if ( buf[i] == '}' )
+      {
+        if ( level <= 0 )
+          return false;
+        level--;
+        if ( level == 0 )
+        {
+          for ( int j = i+1; j < buf.length; j++ )
+          {
+            if ( buf[j] != ' ' && buf[j] != '\n' && buf[j] != '\r' )
+              return false;
+          }
+          return true;
+        }
+      }
+    }
+    return ( level == 0 && fLevel );
+  }
+
+  public static String fill_in_multi_input( String query, String needle, String values )
+  {
+    String dummied = query.replace( needle, "?multival" ).trim();
+
+    dummied = dummied.substring(0,dummied.length()-1);
+
+    values = values.substring(1,values.length()-1);
+
+    String[] splitted = values.split(",");
+
+    if (splitted.length <= 0)
+      return "No results.";
+
+    String filter = "";
+
+    for ( int i = 0; i < splitted.length; i++ )
+    {
+      String one_piece = splitted[i].trim();
+
+      if ( one_piece.length() < 3 )
+        continue;
+
+      filter += (i==0? "" : " || ") + "?multival = <" + one_piece.substring(1,one_piece.length()-1) + ">";
+    }
+
+    return dummied + " FILTER( "+filter+" ) }";
   }
 }
