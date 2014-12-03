@@ -280,7 +280,7 @@ public class Rdfstore
             help_only = true;
             return;
           }
-          System.out.println( "Rircordo Rdfstore will listen on port "+args[++i] );
+          System.out.println( "Rircordo Rdfstore will listen on port "+port );
         }
         else
         {
