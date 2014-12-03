@@ -44,7 +44,6 @@ public class Rdfstore
 
   public static void main(String [] args) throws Exception
   {
-System.out.println( fill_in_multi_input( "SELECT ?x WHERE {?x <[0]> <blah>}", "<[0]>", "{hi,hello,hola}" ) );
     Rdfstore r = new Rdfstore();
     r.run(args);
   }
