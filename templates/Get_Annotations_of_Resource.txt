@@ -5,4 +5,5 @@ WHERE
   <[0]>
   ?p
   ?a
+  FILTER( ?p != <http://open-physiology.org/#super-or-equal> )
 }
