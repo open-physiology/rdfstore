@@ -1,0 +1,11 @@
+# 0 = Graph
+# 1 = Subject
+# 2 = Predicate
+# 3 = Object
+WITH <[0]>
+INSERT
+{
+  <[1]>
+  <[2]>
+  <[3]>
+}
