@@ -488,17 +488,7 @@ public class Rdfstore
         req = "";
       }
 
-      Map<String, String> params = get_args(req);
-
-      /*
-       * Uncomment for debugging purposes:
-       *
-      System.out.println( "Got request:" );
-      for ( Map.Entry<String,String> entry : params.entrySet() )
-        System.out.print( "["+entry.getKey()+"]=["+entry.getValue()+"] " );
-      System.out.print("\n");
-       *
-       */
+      Map<String, String> params = get_args(req, t);
 
       String query = tmplt.text;
       boolean fMultiple = false;
@@ -765,12 +755,23 @@ public class Rdfstore
     send_response( t, the_html );
   }
 
-  public static Map<String, String> get_args(String query)
+  public static Map<String, String> get_args(String query, HttpExchange t)
   {
     Map<String, String> result = new HashMap<String, String>();
+
+    parse_parameters( query, result );
+    String body = post_body( t );
+
+    parse_parameters( body, result );
+
+    return result;
+  }
+
+  static void parse_parameters( String raw, Map<String,String> result )
+  {
     try
     {
-      for (String param : query.split("&"))
+      for (String param : raw.split("&"))
       {
         String pair[] = param.split("=");
         if (pair.length > 1)
@@ -783,7 +784,6 @@ public class Rdfstore
     {
       ;
     }
-    return result;
   }
 
   public static boolean is_update_query( String q )
@@ -919,5 +919,47 @@ public class Rdfstore
     }
 
     return dummied + " FILTER( "+filter+" ) }";
+  }
+
+  static String readLine( BufferedReader br )
+  {
+    try
+    {
+      return br.readLine();
+    }
+    catch( IOException e )
+    {
+      return null;
+    }
+  }
+
+  static String post_body( HttpExchange t )
+  {
+    InputStreamReader is = null;
+    StringBuilder sb = new StringBuilder();
+    boolean fFirst = false;
+
+    try
+    {
+      is = new InputStreamReader(t.getRequestBody(), "UTF-8");
+    }
+    catch( UnsupportedEncodingException e )
+    {
+      return "";
+    }
+
+    BufferedReader br = new BufferedReader(is);
+
+    for ( String line = readLine(br); line != null; line = readLine(br) )
+    {
+      if ( fFirst )
+        sb.append('\n');
+      else
+        fFirst = true;
+
+      sb.append( line );
+    }
+
+    return sb.toString();
   }
 }
