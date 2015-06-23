@@ -489,7 +489,7 @@ public class Rdfstore
       }
 
       Map<String, String> params = get_args(req, t);
-
+	  
       String query = tmplt.text;
       boolean fMultiple = false;
 
@@ -774,8 +774,8 @@ public class Rdfstore
       for (String param : raw.split("&"))
       {
         String pair[] = param.split("=");
-          if (pair[0].length() == 0) continue; // INFO: GRS modified.
-
+		if (pair[0].length() == 0) continue; // INFO: GRS modified.
+		
         if (pair.length > 1)
           result.put(URLDecoder.decode(pair[0],"UTF-8"), URLDecoder.decode(pair[1],"UTF-8"));
         else
