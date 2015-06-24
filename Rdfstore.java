@@ -491,6 +491,7 @@ public class Rdfstore
       Map<String, String> params = get_args(req, t);
 	  
       String query = tmplt.text;
+      String preproc;
       boolean fMultiple = false;
 
       for ( Map.Entry<String,String> entry : params.entrySet() )
@@ -501,9 +502,14 @@ public class Rdfstore
           return;
         }
 
-        if ( preprocessor != null )
+        preproc = tmplt.configs.get("Preprocessor" + entry.getKey());
+
+        if ( preproc == null )
+          preproc = preprocessor;
+
+        if ( preproc != null )
         {
-          String value = call_preprocessor( preprocessor, entry.getValue() ).trim();
+          String value = call_preprocessor( preproc, entry.getValue() ).trim();
 
           if ( value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']' )
           {
@@ -827,8 +833,14 @@ public class Rdfstore
 
     try
     {
-      u = new URL(url + URLEncoder.encode(orig, "UTF-8") );
+      if ( url.contains( "%s" ) )
+        url = url.replace("%s", URLEncoder.encode(orig, "UTF-8"));
+      else
+        url = url + URLEncoder.encode(orig, "UTF-8");
+
+      u = new URL(url);
       c = (HttpURLConnection) u.openConnection();
+      c.setRequestProperty("Accept", "application/json");
 
       /*
        * To do: make these configurable
