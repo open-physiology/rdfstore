@@ -1,0 +1,2 @@
+# 0 property
+select ?VALUEID ?VALUELABEL where {<[0]> <http://www.ddmore.org/ontologies/webannotationtool#displayedvalue> ?z . ?z <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> ?VALUEID . ?z <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> ?r . ?r <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> ?VALUELABEL }

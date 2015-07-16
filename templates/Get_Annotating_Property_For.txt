@@ -1,0 +1,2 @@
+# 0 object 
+select ?property where {<[0]> <http://www.ddmore.org/ontologies/webannotationtool#annotatablewith> ?property}
