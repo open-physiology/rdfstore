@@ -2,8 +2,7 @@
 # 1 = Subject
 # 2 = Predicate
 # 3 = Object
-WITH <[0]>
-DELETE WHERE
+DELETE DATA FROM <[0]>
 {
   <[1]>
   <[2]>
