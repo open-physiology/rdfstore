@@ -1,0 +1,15 @@
+# 0 = Graph
+# 1 = Subject
+# 2 = Predicate
+DELETE FROM <[0]>
+{
+  <[1]>
+  <[2]>
+  ?o
+}
+WHERE
+{
+  <[1]>
+  <[2]>
+  ?o
+}
