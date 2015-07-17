@@ -1,0 +1,8 @@
+# 0 = property
+select ?QUERY
+where
+{
+  <[0]>
+  <http://www.ddmore.org/ontologies/webannotationtool#displayedvalue-query>
+  ?QUERY
+}
