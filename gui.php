@@ -2,8 +2,8 @@
 <head>
 <title>RDFStore Test GUI</title>
 
-<link rel="stylesheet" href="//www.semitrivial.com/base.css">
-<link rel="stylesheet" href="//www.semitrivial.com/skeleton.css">
+<link rel="stylesheet" href="stylesheets/base.css">
+<link rel="stylesheet" href="stylesheets/skeleton.css">
 
 @JAVASCRIPT
 
